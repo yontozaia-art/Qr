@@ -1,0 +1,1574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ORE TRANS Delivery Form & Admin Dashboard</title>
+  
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
+
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- QR Code Generator & QR Scanner Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+  <style>
+    :root {
+      --sidebar-width: 260px;
+      --primary-color: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* SHORT POPUP NOTIFICATION TOASTS */
+    .status-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      z-index: 2000;
+      background-color: #0f172a;
+      color: #ffffff;
+      border: 1px solid #334155;
+      padding: 10px 22px;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+      opacity: 0;
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+
+    .status-toast.toast-success {
+      background-color: #059669;
+      border-color: #10b981;
+      color: #ffffff;
+    }
+
+    .status-toast.toast-warning {
+      background-color: #d97706;
+      border-color: #f59e0b;
+      color: #ffffff;
+    }
+
+    /* LOGIN VIEW STYLES */
+    #view-login {
+      display: none;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      z-index: 2000;
+    }
+    .login-card {
+      background-color: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      padding: 2.25rem 1.75rem;
+      width: 100%;
+      max-width: 400px;
+      position: relative;
+    }
+    .btn-primary-custom {
+      background-color: var(--primary-color);
+      border: none;
+      color: #ffffff;
+      font-weight: 600;
+      padding: 0.8rem;
+      border-radius: 12px;
+      width: 100%;
+      transition: background-color 0.2s;
+    }
+    .btn-primary-custom:hover { background-color: var(--primary-hover); }
+
+    /* FORM STANDALONE VIEW STYLES */
+    #view-form-standalone {
+      min-height: 100vh;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* SIDEBAR & LAYOUT STYLES (ADMIN ONLY) */
+    #app-layout { display: none; }
+    #sidebar {
+      width: var(--sidebar-width);
+      min-height: 100vh;
+      background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+      color: #fff;
+      position: fixed;
+      top: 0; left: 0;
+      z-index: 1040;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #sidebar .nav-link {
+      color: #94a3b8;
+      padding: 12px 18px;
+      margin: 6px 12px;
+      border-radius: 12px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    #sidebar .nav-link:hover, #sidebar .nav-link.active {
+      color: #fff;
+      background: var(--primary-color);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+    }
+    .sidebar-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(2px);
+      z-index: 1035;
+    }
+    .sidebar-backdrop.show { display: block; }
+    
+    #content {
+      margin-left: var(--sidebar-width);
+      padding: 24px;
+      transition: margin 0.3s ease-in-out;
+    }
+
+    .custom-panel, .metric-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
+    }
+    
+    .icon-shape {
+      width: 52px; height: 52px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 1.4rem;
+    }
+    
+    .ore-card {
+      background: #f8fafc; border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; height: 100%;
+      transition: transform 0.2s;
+    }
+    .ore-card:hover { transform: translateY(-2px); }
+
+    /* FORM STYLES */
+    .form-wrapper { width: 100%; max-width: 500px; margin: 0 auto; }
+    .form-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.04);
+      padding: 1.75rem;
+    }
+    @media (min-width: 576px) {
+      .form-card { padding: 2.5rem; }
+    }
+    
+    .card-header-custom {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.75rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--border-color);
+    }
+    
+    .trips-indicator {
+      display: inline-flex; align-items: center; gap: 8px; background-color: #eff6ff; color: #1e40af; font-size: 0.8rem; font-weight: 700; padding: 8px 14px; border-radius: 30px; border: 1px solid #dbeafe; cursor: pointer; transition: all 0.2s ease;
+    }
+    .trips-indicator:hover { background-color: #dbeafe; color: #1d4ed8; }
+    
+    .form-label {
+      font-size: 0.775rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    
+    .form-control {
+      border: 1.5px solid var(--border-color); padding: 0.8rem 1rem; font-size: 1rem; font-weight: 700; color: var(--text-main); background-color: #ffffff; text-transform: uppercase; border-radius: 14px; transition: all 0.2s ease;
+    }
+    @media (min-width: 576px) {
+      .form-control { font-size: 0.95rem; }
+    }
+    .form-control:disabled { background-color: #f8fafc; color: #94a3b8; border-color: var(--border-color); cursor: not-allowed; }
+    .form-control:focus { border-color: var(--primary-color); box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1); background-color: #ffffff; }
+
+    .btn-submit {
+      background-color: var(--primary-color); border: none; color: #ffffff; font-weight: 700; padding: 0.9rem; border-radius: 14px; font-size: 1rem; width: 100%; transition: background-color 0.2s ease; margin-top: 1rem; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+    .btn-submit:hover { background-color: var(--primary-hover); }
+
+    /* RESPONSIVE ADJUSTMENTS FOR SIDEBAR */
+    @media (max-width: 991.98px) {
+      #sidebar { transform: translateX(-100%); }
+      #sidebar.show { transform: translateX(0); }
+      #content { margin-left: 0; padding: 14px 10px; }
+    }
+
+    #qr-reader {
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      border: none !important;
+    }
+    #qr-reader video {
+      border-radius: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SHORT POPUP NOTIFICATION TOASTS -->
+  <div id="offlineToast" class="status-toast">
+    <i class="bi bi-wifi-off text-warning"></i>
+    <span>Offline Mode</span>
+  </div>
+
+  <div id="syncedToast" class="status-toast">
+    <i class="bi bi-cloud-check-fill text-success"></i>
+    <span id="syncedToastText">Synced!</span>
+  </div>
+
+  <div id="actionToast" class="status-toast">
+    <i id="actionToastIcon" class="bi bi-check-circle-fill"></i>
+    <span id="actionToastText">Success!</span>
+  </div>
+
+  <!-- ==================== 1. STANDALONE DELIVERY FORM ==================== -->
+  <div id="view-form-standalone">
+    <div class="form-wrapper">
+      <div class="form-card">
+        <div class="card-header-custom">
+          <div class="trips-indicator" id="tripsIndicatorBtn" title="Click to view latest ticket details">
+            <i class="bi bi-truck fs-6"></i>
+            <span>TRIPS: <strong id="tripCount">0</strong></span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary py-1.5 px-3 rounded-pill fw-semibold shadow-sm" onclick="openQRScanner()"><i class="bi bi-qr-code-scan me-1"></i> Scan QR</button>
+            <button class="btn btn-sm btn-light border py-1.5 px-3 rounded-pill fw-semibold shadow-sm" onclick="handleDashboardClick()"><i class="bi bi-grid-1x2 me-1"></i> Dashboard</button>
+          </div>
+        </div>
+
+        <form id="drForm" class="needs-validation" novalidate>
+          <div class="mb-3">
+            <label for="entry_date" class="form-label">Entry Date (PH Time)</label>
+            <input type="date" class="form-control" id="entry_date" disabled required>
+          </div>
+
+          <div class="mb-3">
+            <label for="dr_number" class="form-label">Dumptruck No. (Hal. DT-41)</label>
+            <div class="input-group">
+              <input type="text" class="form-control" id="dr_number" required placeholder="Ilagay o i-scan ang DT No.">
+              <button class="btn btn-outline-secondary rounded-end-4 px-3" type="button" onclick="openQRScanner()" title="Scan QR"><i class="bi bi-qr-code-scan"></i></button>
+            </div>
+            <div class="invalid-feedback">Mangyaring maglagay ng valid na Dumptruck No.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="source" class="form-label">Source</label>
+            <input class="form-control" list="sourceList" id="source" required autocomplete="off" placeholder="Pumili o i-type ang Source">
+            <datalist id="sourceList">
+                <option value="BLA"><option value="BLB"><option value="BLC"><option value="BLD">
+                <option value="BLE"><option value="BOL"><option value="BOLAS"><option value="BRAVO">
+                <option value="DELTA"><option value="CHARLIE"><option value="FOXTROT">
+                <option value="UPPER CHARLIE"><option value="ECHO"><option value="CRO">
+            </datalist>
+            <div class="invalid-feedback">Mangyaring maglagay o pumili ng Source.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="prepile_no" class="form-label">
+                Prepile No <span class="text-muted fw-normal">(Optional)</span>
+            </label>
+            <input type="text" inputmode="numeric" pattern="[0-9]*" class="form-control" id="prepile_no" placeholder="Opsyonal">
+            <div class="invalid-feedback">Numero lamang ang pinapayagan.</div>
+          </div>
+
+          <div class="mb-4">
+            <label for="ore_class" class="form-label">Ore Class</label>
+            <input class="form-control" list="oreList" id="ore_class" required autocomplete="off" placeholder="Pumili o i-type ang Ore Class">
+            <datalist id="oreList">
+                <option value="SA"><option value="SB"><option value="SC"><option value="SD">
+                <option value="SE"><option value="SF"><option value="SG"><option value="SH">
+                <option value="SI"><option value="SJ"><option value="SK"><option value="SL">
+            </datalist>
+            <div class="invalid-feedback">Mangyaring maglagay o pumili ng Ore Class.</div>
+          </div>
+
+          <button type="submit" class="btn btn-submit" id="submitBtn">
+            <i class="bi bi-check2-circle me-1 fs-5 align-middle"></i> Save Record
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 2. LOGIN VIEW ==================== -->
+  <div id="view-login">
+    <div class="login-card">
+      <button type="button" class="btn-close position-absolute top-0 end-0 m-3" onclick="closeLogin()"></button>
+      <div class="text-center mb-4">
+        <div class="bg-primary text-white p-3 rounded-circle d-inline-flex mb-3 shadow-sm" style="width: 60px; height: 60px; align-items: center; justify-content: center;">
+          <i class="bi bi-truck fs-3"></i>
+        </div>
+        <h3 class="fw-bold text-dark">Admin Login</h3>
+        <p class="text-muted small">I-enter ang iyong mga detalye para makapasok sa Admin Dashboard.</p>
+      </div>
+
+      <div id="loginAlert"></div>
+
+      <form id="loginForm">
+        <div class="mb-3">
+          <label for="login-username" class="form-label">Username</label>
+          <input type="text" class="form-control" id="login-username" required autocomplete="username">
+        </div>
+        <div class="mb-4">
+          <label for="login-password" class="form-label">Password</label>
+          <input type="password" class="form-control" id="login-password" required autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn btn-primary-custom" id="loginBtn">
+          <i class="bi bi-box-arrow-in-right me-1"></i> Mag-login
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== 3. ADMIN APPLICATION LAYOUT ==================== -->
+  <div id="app-layout">
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="toggleSidebar()"></div>
+
+    <nav id="sidebar" class="d-flex flex-column flex-shrink-0 p-3">
+      <div class="d-flex align-items-center justify-content-between mb-4 px-2 pt-2">
+        <div class="d-flex align-items-center gap-2">
+          <div class="bg-warning text-dark p-2 rounded-3 d-flex align-items-center justify-content-center" style="width:40px; height:40px;"><i class="bi bi-truck fs-5"></i></div>
+          <div><h6 class="fw-bold text-white m-0 lh-1">Ore Transportation</h6><small class="text-white-50" style="font-size:0.7rem;">Admin Panel</small></div>
+        </div>
+        <button class="btn btn-link text-white d-lg-none p-0 fs-4" onclick="toggleSidebar()"><i class="bi bi-x"></i></button>
+      </div>
+      
+      <hr class="border-secondary opacity-25 my-1">
+
+      <ul class="nav nav-pills flex-column mb-auto mt-2">
+        <li class="nav-item"><a class="nav-link" onclick="exitAdminToForm()"><i class="bi bi-file-earmark-plus-fill fs-5"></i> Delivery Form</a></li>
+        <li class="nav-item"><a class="nav-link active" id="nav-dashboard" onclick="switchPage('dashboard')"><i class="bi bi-grid-1x2-fill fs-5"></i> Dashboard</a></li>
+        <li class="nav-item"><a class="nav-link" id="nav-records" onclick="switchPage('records')"><i class="bi bi-table fs-5"></i> Ore_Trans Record</a></li>
+        <li class="nav-item"><a class="nav-link" id="nav-summary" onclick="switchPage('summary')"><i class="bi bi-file-earmark-bar-graph fs-5"></i> Summary Reports</a></li>
+        <li class="nav-item"><a class="nav-link" id="nav-archive" onclick="switchPage('archive')"><i class="bi bi-archive fs-5"></i> Archive Records</a></li>
+        <li class="nav-item"><a class="nav-link" id="nav-archive-summary" onclick="switchPage('archive-summary')"><i class="bi bi-file-earmark-bar-graph-fill fs-5"></i> All Records Summary Reports</a></li>
+      </ul>
+
+      <div class="px-3 py-3 bg-dark bg-opacity-40 rounded-4 text-muted small mt-auto border border-secondary border-opacity-25">
+        <div class="d-flex align-items-center gap-3 mb-2">
+          <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px;">AD</div>
+          <div class="overflow-hidden">
+            <div class="text-white fw-semibold fs-7 text-truncate" id="sessionUser">Admin</div>
+            <div class="fs-8 text-success" id="connectionStatusIndicator"><i class="bi bi-circle-fill" style="font-size: 6px;"></i> Supabase Live</div>
+          </div>
+        </div>
+        <button onclick="logout()" class="btn btn-sm btn-outline-danger w-100 mt-2 rounded-3 py-2">
+          <i class="bi bi-box-arrow-right me-1"></i> Logout Admin
+        </button>
+      </div>
+    </nav>
+
+    <div id="content">
+      <div class="d-flex align-items-center justify-content-between mb-4 custom-panel p-3 px-4">
+        <div class="d-flex align-items-center">
+          <button class="btn btn-light d-lg-none border px-2 py-1 shadow-sm rounded-3 me-3" onclick="toggleSidebar()"><i class="bi bi-list fs-5"></i></button>
+          <h4 class="m-0 fw-bold text-dark fs-5 fs-md-4" id="pageTitle">Dashboard Overview</h4>
+        </div>
+      </div>
+
+      <div id="view-dashboard">
+        <div class="row g-3 mb-4">
+          <div class="col-12 col-sm-6 col-xl-4">
+            <div class="card metric-card p-4 shadow-sm h-100">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <p class="mb-1 text-muted text-uppercase fw-semibold fs-8">Total Active Trips</p>
+                  <h2 class="fw-bold mb-0 text-dark" id="cardTotalRecords">0</h2>
+                </div>
+                <div class="icon-shape bg-primary-subtle text-primary"><i class="bi bi-folder2-open"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="custom-panel p-4">
+          <h5 class="fw-bold text-dark mb-4"><i class="bi bi-bar-chart-fill me-2 text-primary"></i>Ore Class Distribution Volume</h5>
+          <div class="row g-3" id="oreTripsContainer"></div>
+        </div>
+      </div>
+
+      <div id="view-records" style="display: none;">
+        <div class="custom-panel p-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-stretch align-items-md-center gap-3 mb-4">
+            <div class="input-group w-100 shadow-sm" style="max-width: 420px; border-radius: 12px; overflow:hidden;">
+              <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+              <input type="text" id="searchInput" class="form-control border-start-0 bg-white shadow-none ps-0" placeholder="Hanapin ang Dumptruck, Date, Source..." onkeyup="renderTable()" style="font-size:0.9rem; border-radius:0 12px 12px 0;">
+            </div>
+            <div class="d-flex gap-2">
+              <button class="btn btn-outline-warning btn-sm px-3 flex-fill py-2 rounded-3 fw-semibold" id="btnArchiveAll" onclick="archiveAllRecords()"><i class="bi bi-archive me-1"></i> Archive All</button>
+              <button class="btn btn-outline-success btn-sm px-3 flex-fill py-2 rounded-3 fw-semibold" onclick="exportToCSV()"><i class="bi bi-download me-1"></i> Export CSV</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-nowrap">
+              <thead>
+                <tr><th>ID</th><th>DATE</th><th>DUMPTRUCK NO.</th><th>SOURCE</th><th>PREPILE NO.</th><th>ORE CLASS</th><th class="text-end">ACTIONS</th></tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-summary" style="display: none;">
+        <div class="custom-panel p-4">
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-stretch align-items-sm-center gap-3 mb-4">
+            <h5 class="fw-bold text-dark m-0 fs-5"><i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i>Aggregated Summary Reports</h5>
+            <button class="btn btn-outline-success btn-sm px-3 py-2 rounded-3 fw-semibold" onclick="exportSummaryCSV()"><i class="bi bi-download me-1"></i> Export Summary CSV</button>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-nowrap">
+              <thead>
+                <tr><th>DATE</th><th>SOURCE</th><th>PREPILE NO.</th><th>ORE CLASS</th><th class="text-center">TOTAL TRIPS</th></tr>
+              </thead>
+              <tbody id="summaryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-archive" style="display: none;">
+        <div class="custom-panel p-4">
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3 mb-4">
+            <h5 class="fw-bold text-dark m-0 fs-5"><i class="bi bi-archive me-2 text-primary"></i>Archived Records</h5>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <div class="input-group input-group-sm flex-fill flex-lg-grow-0 shadow-sm" style="width: auto;">
+                <span class="input-group-text bg-white"><i class="bi bi-calendar-event"></i></span>
+                <input type="date" id="archiveFilterDate" class="form-control shadow-none" onchange="renderArchiveTable()" style="font-size:0.85rem;">
+                <button class="btn btn-outline-secondary" onclick="document.getElementById('archiveFilterDate').value=''; renderArchiveTable();"><i class="bi bi-x-lg"></i></button>
+              </div>
+              <button class="btn btn-outline-danger btn-sm px-3 py-2 rounded-3 fw-semibold flex-fill flex-lg-grow-0" id="btnDeleteAllArchive" onclick="deleteAllArchiveRecords()"><i class="bi bi-trash3 me-1"></i> Delete All</button>
+              <button class="btn btn-outline-success btn-sm px-3 py-2 rounded-3 fw-semibold flex-fill flex-lg-grow-0" onclick="exportArchiveCSV()"><i class="bi bi-download me-1"></i> Export CSV</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-nowrap">
+              <thead>
+                <tr><th>ID</th><th>DATE</th><th>DUMPTRUCK NO.</th><th>SOURCE</th><th>PREPILE NO.</th><th>ORE CLASS</th><th class="text-end">ACTIONS</th></tr>
+              </thead>
+              <tbody id="archiveTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== 4. ALL RECORDS SUMMARY REPORTS VIEW ==================== -->
+      <div id="view-archive-summary" style="display: none;">
+        <div class="custom-panel p-4">
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-stretch align-items-lg-center gap-3 mb-4">
+            <h5 class="fw-bold text-dark m-0 fs-5"><i class="bi bi-file-earmark-bar-graph-fill me-2 text-primary"></i>All Records Summary Reports</h5>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <button class="btn btn-outline-success btn-sm px-3 py-2 rounded-3 fw-semibold flex-fill flex-lg-grow-0" onclick="exportArchiveSummaryCSV()"><i class="bi bi-download me-1"></i> Export Summary CSV</button>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 text-nowrap">
+              <thead>
+                <tr><th>SOURCE</th><th>PREPILE NO.</th><th>ORE CLASS</th><th class="text-center">TOTAL TRIPS</th></tr>
+              </thead>
+              <tbody id="archiveSummaryTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODALS -->
+  <div class="modal fade" id="latestTicketModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4 p-2">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-receipt me-1"></i> Latest Ticket Details</h5>
+                <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3" id="modalBodyContent">
+                <div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div></div>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4 py-2" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <!-- QR SCANNER MODAL (MAY LIVE CAMERA AT FILE UPLOAD PILIHAN) -->
+  <div class="modal fade" id="qrScannerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow-lg rounded-4 p-3">
+        <div class="modal-header border-bottom-0 pb-0">
+          <h5 class="modal-title fw-bold text-primary"><i class="bi bi-qr-code-scan me-1"></i> Scan Dumptruck QR</h5>
+          <button type="button" class="btn-close shadow-none" data-bs-dismiss="modal" aria-label="Close" onclick="stopQRScanner()"></button>
+        </div>
+        <div class="modal-body text-center py-3">
+          <p class="text-muted small mb-2">Itapat ang camera o pumili ng QR code image mula sa gallery.</p>
+          
+          <!-- Live Camera View -->
+          <div id="qr-reader"></div>
+          
+          <!-- Alternatibong Button para sa mga naka-block ang Camera sa Browser -->
+          <div class="mt-3">
+            <label for="qr-file-input" class="btn btn-outline-primary btn-sm rounded-pill px-4 py-2 w-100 fw-semibold">
+              <i class="bi bi-image me-1"></i> Mag-upload ng QR Screenshot / Photo
+            </label>
+            <input type="file" id="qr-file-input" accept="image/*" class="d-none" onchange="scanQRFromFile(event)">
+          </div>
+
+          <div id="qr-reader-results" class="mt-3 fw-bold text-success small"></div>
+        </div>
+        <div class="modal-footer border-top-0 pt-0 justify-content-center">
+          <button type="button" class="btn btn-secondary btn-sm rounded-pill px-4 py-2" data-bs-dismiss="modal" onclick="stopQRScanner()">Isara</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- QR GENERATOR MODAL -->
+  <div class="modal fade" id="qrGeneratorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg rounded-4 p-3 text-center">
+        <div class="modal-header border-bottom-0 pb-0 justify-content-center">
+          <h5 class="modal-title fw-bold text-dark" id="qrModalTitle">Dumptruck QR</h5>
+          <button type="button" class="btn-close position-absolute top-0 end-0 m-3 shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body py-3">
+          <div id="qrcode" class="d-inline-block p-3 bg-white border rounded-4 shadow-sm"></div>
+          <p class="text-muted small mt-2 mb-0" id="qrModalSubtext"></p>
+        </div>
+        <div class="modal-footer border-top-0 pt-0 justify-content-center">
+          <button type="button" class="btn btn-primary btn-sm rounded-pill px-4 py-2" onclick="window.print()"><i class="bi bi-printer me-1"></i> Print QR</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="viewModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow rounded-4 p-2">
+        <div class="modal-header bg-primary text-white rounded-3 mb-2"><h5 class="modal-title">Ticket Details</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body p-3" id="viewModalBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border-0 shadow rounded-4 p-3">
+        <div class="modal-header bg-dark text-white rounded-3 mb-3"><h5 class="modal-title">Edit Record #<span id="editModalId"></span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body p-0">
+          <form id="editForm" onsubmit="saveEdit(event)">
+            <input type="hidden" id="editRowId">
+            <div class="mb-3"><label class="form-label">Date</label><input type="date" class="form-control" id="editDate" required></div>
+            <div class="mb-3"><label class="form-label">Dumptruck No.</label><input type="text" class="form-control" id="editDrNo" required></div>
+            <div class="mb-3"><label class="form-label">Source</label><input type="text" class="form-control" id="editSource" required></div>
+            <div class="mb-3"><label class="form-label">Prepile No.</label><input type="text" class="form-control" id="editPrepile"></div>
+            <div class="mb-4"><label class="form-label">Ore Class</label><input type="text" class="form-control" id="editOreClass" required></div>
+            <button type="submit" class="btn btn-primary px-4 w-100 py-3 rounded-3 fw-bold">Save Changes</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // SUPABASE CONFIGURATION
+      const SUPABASE_URL = 'https://vadeoizpmmqhjkrejsfu.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_3_kw87XDsE0R0SDkW74HBA_diPUrmKb';
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      const oreClassList = ["SA", "SB", "SC", "SD", "SE", "SF", "SG", "SH", "SI", "SJ", "SK", "SL"];
+
+      let records = [];
+      let archiveRecords = [];
+      let isSyncing = false; 
+      let isSubmitting = false; 
+      let html5QrCode = null;
+
+      // ==========================================
+      // QR CODE SCANNER LOGIC (LIVE CAMERA + FILE SCAN)
+      // ==========================================
+      window.openQRScanner = function() {
+        const modal = new bootstrap.Modal(document.getElementById('qrScannerModal'));
+        modal.show();
+
+        setTimeout(() => {
+          if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("qr-reader");
+          }
+          
+          html5QrCode.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+              handleScannedResult(decodedText);
+            },
+            (errorMessage) => {}
+          ).catch(err => {
+            console.warn("Camera restricted or not HTTPS:", err);
+            document.getElementById('qr-reader-results').innerHTML = `<span class="text-danger small">Hindi ma-access ang live camera ng browser. Gamitin ang "Mag-upload ng QR Screenshot" sa ibaba.</span>`;
+          });
+        }, 300);
+      };
+
+      window.scanQRFromFile = function(e) {
+        if (e.target.files.length === 0) return;
+        const file = e.target.files[0];
+
+        if (!html5QrCode) {
+          html5QrCode = new Html5Qrcode("qr-reader");
+        }
+
+        html5QrCode.scanFile(file, true)
+          .then(decodedText => {
+            handleScannedResult(decodedText);
+          })
+          .catch(err => {
+            console.error("Error scanning file:", err);
+            document.getElementById('qr-reader-results').innerHTML = `<span class="text-danger">Hindi nabasa ang QR code sa litrato. Subukan ang iba.</span>`;
+          });
+      };
+
+      function handleScannedResult(text) {
+        const cleanedText = text.toUpperCase().trim();
+        document.getElementById('dr_number').value = cleanedText;
+        document.getElementById('qr-reader-results').innerHTML = `<i class="bi bi-check-circle-fill text-success"></i> Na-scan: ${cleanedText}`;
+        
+        triggerSuccessFeedback();
+        showNotification('success', `Dumptruck No. nailagay: ${cleanedText}`);
+
+        setTimeout(() => {
+          stopQRScanner();
+          const modalEl = document.getElementById('qrScannerModal');
+          const modalInstance = bootstrap.Modal.getInstance(modalEl);
+          if (modalInstance) modalInstance.hide();
+        }, 800);
+      }
+
+      window.stopQRScanner = function() {
+        if (html5QrCode && html5QrCode.isScanning) {
+          html5QrCode.stop().then(() => {
+            html5QrCode.clear();
+          }).catch(err => {
+            console.error("Failed to stop scanner.", err);
+          });
+        }
+        document.getElementById('qr-reader-results').innerHTML = '';
+      };
+
+      window.showQRCode = function(drNumber, source) {
+        document.getElementById('qrModalTitle').innerText = `Dumptruck: ${drNumber}`;
+        document.getElementById('qrModalSubtext').innerText = `Source: ${source}`;
+        
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = "";
+        
+        new QRCode(qrContainer, {
+          text: drNumber,
+          width: 180,
+          height: 180,
+          colorDark: "#0f172a",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
+        new bootstrap.Modal(document.getElementById('qrGeneratorModal')).show();
+      };
+
+      // ==========================================
+      // AUTOMATIC 5:30 AM EXPORT SCHEDULER (PH TIME)
+      // ==========================================
+      function checkAndAutoExport() {
+        const now = new Date();
+        const phTimeOptions = { timeZone: 'Asia/Manila', hour: '2-digit', minute: '2-digit', hour12: false };
+        const phTimeStr = new Intl.DateTimeFormat('en-GB', phTimeOptions).format(now);
+        
+        if (phTimeStr === "05:30") {
+          const todayDateStr = getPhDateString();
+          const lastExportDate = sessionStorage.getItem('last_auto_export_date');
+
+          if (lastExportDate !== todayDateStr) {
+            if (typeof exportToCSV === 'function' && records.length > 0) {
+              exportToCSV();
+            }
+            
+            setTimeout(() => {
+              if (typeof exportSummaryCSV === 'function' && records.length > 0) {
+                exportSummaryCSV();
+              }
+            }, 1500);
+
+            sessionStorage.setItem('last_auto_export_date', todayDateStr);
+            showNotification('success', 'Naisagawa na ang Automatic 5:30 AM Export!');
+          }
+        }
+      }
+
+      setInterval(checkAndAutoExport, 30000);
+
+      // VIBRATION & SOUND FEEDBACK HELPER
+      function triggerSuccessFeedback() {
+        if ("vibrate" in navigator) {
+          try { navigator.vibrate([120]); } catch (e) {}
+        }
+
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            const ctx = new AudioContext();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15);
+
+            gain.gain.setValueAtTime(0.2, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.2);
+          }
+        } catch (e) {}
+      }
+
+      function getPhDateString() {
+          return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+      }
+      function getPhTimestampString() {
+          return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(new Date()).replace(',', '');
+      }
+      document.getElementById('entry_date').value = getPhDateString();
+
+      let toastTimer;
+      function showToast(toastId, duration = 3000) {
+        document.querySelectorAll('.status-toast').forEach(t => t.classList.remove('show'));
+        const toast = document.getElementById(toastId);
+        if (toast) {
+          toast.classList.add('show');
+          clearTimeout(toastTimer);
+          if (duration > 0) {
+            toastTimer = setTimeout(() => { toast.classList.remove('show'); }, duration);
+          }
+        }
+      }
+
+      function hideToast(toastId) {
+        const toast = document.getElementById(toastId);
+        if (toast) toast.classList.remove('show');
+      }
+
+      function showNotification(type, message) {
+        const toast = document.getElementById('actionToast');
+        const icon = document.getElementById('actionToastIcon');
+        const text = document.getElementById('actionToastText');
+
+        toast.className = 'status-toast'; 
+        if (type === 'success') {
+          toast.classList.add('toast-success');
+          icon.className = 'bi bi-check-circle-fill';
+        } else if (type === 'warning') {
+          toast.classList.add('toast-warning');
+          icon.className = 'bi bi-exclamation-triangle-fill';
+        } else {
+          icon.className = 'bi bi-info-circle-fill';
+        }
+
+        text.innerText = message;
+        showToast('actionToast', 3500);
+      }
+
+      function updateConnectionStatus() {
+        const offlineQueue = JSON.parse(localStorage.getItem('offline_dr_queue') || '[]');
+        const connIndicator = document.getElementById('connectionStatusIndicator');
+
+        if (navigator.onLine) {
+            hideToast('offlineToast');
+            if(connIndicator) {
+              connIndicator.className = 'fs-8 text-success';
+              connIndicator.innerHTML = '<i class="bi bi-circle-fill" style="font-size: 6px;"></i> Supabase Live';
+            }
+            if (offlineQueue.length > 0 && !isSyncing) {
+                syncOfflineQueue();
+            }
+        } else {
+            showToast('offlineToast', 0);
+            if(connIndicator) {
+              connIndicator.className = 'fs-8 text-warning';
+              connIndicator.innerHTML = `<i class="bi bi-circle-fill" style="font-size: 6px;"></i> Offline (${offlineQueue.length})`;
+            }
+        }
+      }
+
+      window.addEventListener('online', updateConnectionStatus);
+      window.addEventListener('offline', updateConnectionStatus);
+      updateConnectionStatus();
+
+      async function syncOfflineQueue() {
+          if (isSyncing) return;
+          
+          let offlineQueue = JSON.parse(localStorage.getItem('offline_dr_queue') || '[]');
+          let archiveQueue = JSON.parse(localStorage.getItem('offline_archive_queue') || '[]');
+
+          if (offlineQueue.length === 0 && archiveQueue.length === 0) return;
+
+          isSyncing = true;
+          const syncedText = document.getElementById('syncedToastText');
+          if (syncedText) syncedText.innerText = `Syncing offline records...`;
+          showToast('syncedToast', 0);
+
+          try {
+              if (offlineQueue.length > 0) {
+                  const { data: existingData } = await supabase.from('dr_records').select('dr_number, entry_date');
+                  const existingSet = new Set((existingData || []).map(item => `${item.dr_number}_${item.entry_date}`));
+                  
+                  const uniqueOfflineQueue = offlineQueue.filter(item => !existingSet.has(`${item.dr_number}_${item.entry_date}`));
+
+                  localStorage.removeItem('offline_dr_queue');
+
+                  if (uniqueOfflineQueue.length > 0) {
+                      const { error } = await supabase.from('dr_records').insert(uniqueOfflineQueue);
+                      if (error) {
+                          localStorage.setItem('offline_dr_queue', JSON.stringify(uniqueOfflineQueue));
+                      }
+                  }
+              }
+
+              if (archiveQueue.length > 0) {
+                  localStorage.removeItem('offline_archive_queue');
+                  await supabase.from('archive_tbl').insert(archiveQueue);
+              }
+
+              if (syncedText) syncedText.innerText = `Synced Successfully!`;
+              setTimeout(() => hideToast('syncedToast'), 2500);
+          } catch (err) {
+              console.error("Sync Exception:", err);
+          } finally {
+              isSyncing = false;
+              loadDatabaseData();
+          }
+      }
+
+      window.handleDashboardClick = function() {
+        const isLogged = localStorage.getItem('logged_in') === 'true';
+        if (isLogged) {
+          openAdminLayout();
+        } else {
+          document.getElementById('view-login').style.display = 'flex';
+        }
+      };
+
+      window.closeLogin = function() {
+        document.getElementById('view-login').style.display = 'none';
+      };
+
+      function openAdminLayout() {
+        document.getElementById('view-form-standalone').style.display = 'none';
+        document.getElementById('view-login').style.display = 'none';
+        document.getElementById('app-layout').style.display = 'block';
+        document.getElementById('sessionUser').innerText = localStorage.getItem('username') || 'Admin';
+        switchPage('dashboard');
+      }
+
+      window.exitAdminToForm = function() {
+        document.getElementById('app-layout').style.display = 'none';
+        document.getElementById('view-form-standalone').style.display = 'flex';
+      };
+
+      const loginFormEl = document.getElementById('loginForm');
+      if (loginFormEl) {
+        loginFormEl.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const user = document.getElementById('login-username').value.trim();
+          const pass = document.getElementById('login-password').value.trim();
+          const alertBox = document.getElementById('loginAlert');
+          const btn = document.getElementById('loginBtn');
+
+          btn.disabled = true;
+          btn.innerHTML = 'Signing in...';
+          alertBox.innerHTML = '';
+
+          try {
+            const { data, error } = await supabase.from('users').select('*').eq('username', user);
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+              if (data[0].password === pass) {
+                localStorage.setItem('logged_in', 'true');
+                localStorage.setItem('username', data[0].username);
+                openAdminLayout();
+              } else {
+                alertBox.innerHTML = `<div class="alert alert-danger py-2 small">Maling password ang nailagay mo.</div>`;
+              }
+            } else {
+              alertBox.innerHTML = `<div class="alert alert-danger py-2 small">Walang nakitang account.</div>`;
+            }
+          } catch (err) {
+            alertBox.innerHTML = `<div class="alert alert-danger py-2 small">Login Error: ${err.message}</div>`;
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-1"></i> Mag-login';
+          }
+        });
+      }
+
+      loadDatabaseData();
+
+      window.logout = function() {
+        localStorage.removeItem('logged_in');
+        localStorage.removeItem('username');
+        exitAdminToForm();
+      };
+
+      window.toggleSidebar = function() {
+        document.getElementById('sidebar').classList.toggle('show');
+        document.getElementById('sidebarBackdrop').classList.toggle('show');
+      };
+
+      window.switchPage = function(p) {
+        ['dashboard', 'records', 'summary', 'archive', 'archive-summary'].forEach(v => {
+          document.getElementById('view-' + v).style.display = (v === p) ? 'block' : 'none';
+        });
+        ['dashboard', 'records', 'summary', 'archive', 'archive-summary'].forEach(v => {
+          let navEl = document.getElementById('nav-' + v);
+          if (navEl) navEl.classList.toggle('active', v === p);
+        });
+        const titles = { 
+          dashboard: 'Dashboard Overview', 
+          records: 'Ore_Trans Table', 
+          summary: 'Aggregated Summary Reports', 
+          archive: 'Archived Records',
+          'archive-summary': 'All Records Summary Reports'
+        };
+        document.getElementById('pageTitle').innerText = titles[p] || 'Dashboard Overview';
+        if (window.innerWidth < 992 && document.getElementById('sidebar').classList.contains('show')) toggleSidebar();
+      };
+
+      const tripsIndicatorBtn = document.getElementById('tripsIndicatorBtn');
+      const modalBodyContent = document.getElementById('modalBodyContent');
+      const latestTicketModal = new bootstrap.Modal(document.getElementById('latestTicketModal'));
+
+      tripsIndicatorBtn.addEventListener('click', function() {
+          latestTicketModal.show();
+          if (records.length > 0) {
+              const data = records[records.length - 1];
+              modalBodyContent.innerHTML = `
+                  <ul class="list-group list-group-flush">
+                      <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-1"><span class="text-muted small fw-semibold">Dumptruck No:</span><span class="fw-bold text-dark">${data.dr_number}</span></li>
+                      <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-1"><span class="text-muted small fw-semibold">Source:</span><span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1">${data.source}</span></li>
+                      <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-1"><span class="text-muted small fw-semibold">Prepile No:</span><span class="fw-bold text-dark">${data.prepile_no || 'NONE'}</span></li>
+                      <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-1"><span class="text-muted small fw-semibold">Ore Class:</span><span class="badge bg-success-subtle text-success fw-bold px-2 py-1">${data.ore_class}</span></li>
+                      <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-1"><span class="text-muted small fw-semibold">Entry Date:</span><span class="fw-bold text-dark">${data.entry_date}</span></li>
+                  </ul>`;
+          } else {
+              modalBodyContent.innerHTML = `<div class="text-center py-4 text-muted"><p class="mb-0">No records found yet.</p></div>`;
+          }
+      });
+
+      async function loadDatabaseData() {
+        if (navigator.onLine && !isSyncing) {
+          try {
+            const { data: active } = await supabase.from('dr_records').select('*').order('id', { ascending: true });
+            const { data: archive } = await supabase.from('archive_tbl').select('*').order('id', { ascending: true });
+
+            records = active || [];
+            archiveRecords = archive || [];
+
+            localStorage.setItem('cached_records', JSON.stringify(records));
+            localStorage.setItem('cached_archive', JSON.stringify(archiveRecords));
+          } catch (err) {
+            console.error("Database Load Error:", err);
+          }
+        } else {
+          records = JSON.parse(localStorage.getItem('cached_records') || '[]');
+          archiveRecords = JSON.parse(localStorage.getItem('cached_archive') || '[]');
+        }
+
+        document.getElementById('tripCount').textContent = records.length;
+        renderTable();
+      }
+
+      const drFormEl = document.getElementById('drForm');
+      if (drFormEl) {
+        drFormEl.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          
+          if (isSubmitting) return; 
+
+          const submitBtn = document.getElementById('submitBtn');
+          const drNumberInput = document.getElementById('dr_number');
+          const prepileInput = document.getElementById('prepile_no');
+
+          if (!drFormEl.checkValidity()) {
+            drFormEl.classList.add('was-validated');
+            return;
+          }
+
+          isSubmitting = true;
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Saving...';
+
+          const recordData = {
+            dr_number: drNumberInput.value.toUpperCase().trim(),
+            source: document.getElementById('source').value.toUpperCase().trim(),
+            prepile_no: prepileInput.value !== '' ? prepileInput.value.trim() : null,
+            ore_class: document.getElementById('ore_class').value.toUpperCase().trim(),
+            entry_date: getPhDateString(),
+            created_at: getPhTimestampString()
+          };
+
+          if (!navigator.onLine) {
+            let offlineQueue = JSON.parse(localStorage.getItem('offline_dr_queue') || '[]');
+            let cachedRecords = JSON.parse(localStorage.getItem('cached_records') || '[]');
+            
+            const isDuplicateOffline = offlineQueue.some(item => item.dr_number === recordData.dr_number && item.entry_date === recordData.entry_date);
+            const isDuplicateCached = cachedRecords.some(item => item.dr_number === recordData.dr_number && item.entry_date === recordData.entry_date);
+
+            if (isDuplicateOffline || isDuplicateCached) {
+                showNotification('warning', `Na-save na o nakapila na ang Dumptruck ${recordData.dr_number} ngayong araw!`);
+            } else {
+                offlineQueue.push(recordData);
+                localStorage.setItem('offline_dr_queue', JSON.stringify(offlineQueue));
+
+                records.push({ id: 'OFFLINE-' + Date.now(), ...recordData });
+                localStorage.setItem('cached_records', JSON.stringify(records));
+
+                triggerSuccessFeedback(); 
+                showNotification('success', `Saved offline! (Truck: ${recordData.dr_number})`);
+
+                drFormEl.reset();
+                document.getElementById('entry_date').value = getPhDateString();
+                drFormEl.classList.remove('was-validated');
+            }
+
+            submitBtn.disabled = false;
+            isSubmitting = false;
+            submitBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Save Record';
+
+            updateConnectionStatus();
+            document.getElementById('tripCount').textContent = records.length;
+            renderTable();
+            return;
+          }
+
+          try {
+            let offlineQueue = JSON.parse(localStorage.getItem('offline_dr_queue') || '[]');
+            const isDuplicateOffline = offlineQueue.some(item => item.dr_number === recordData.dr_number && item.entry_date === recordData.entry_date);
+
+            const { data: existing } = await supabase
+              .from('dr_records')
+              .select('id')
+              .eq('dr_number', recordData.dr_number)
+              .eq('entry_date', recordData.entry_date);
+
+            if ((existing && existing.length > 0) || isDuplicateOffline) {
+              showNotification('warning', `Na-save na ang Dumptruck ${recordData.dr_number} ngayong araw!`);
+            } else {
+              const { error } = await supabase.from('dr_records').insert([recordData]);
+              if (error) {
+                showNotification('warning', `Error: ${error.message}`);
+              } else {
+                triggerSuccessFeedback(); 
+                showNotification('success', `Successfully Saved! (Truck: ${recordData.dr_number})`);
+
+                drFormEl.reset();
+                document.getElementById('entry_date').value = getPhDateString();
+                drFormEl.classList.remove('was-validated');
+                await loadDatabaseData();
+              }
+            }
+          } catch (err) {
+             console.error("Error saving:", err);
+          } finally {
+             submitBtn.disabled = false;
+             isSubmitting = false;
+             submitBtn.innerHTML = '<i class="bi bi-check2-circle me-1"></i> Save Record';
+          }
+        });
+      }
+
+      window.renderTable = function() {
+        const searchInput = document.getElementById('searchInput');
+        const q = searchInput ? searchInput.value.toLowerCase() : '';
+        let filtered = records.filter(r => Object.values(r).some(val => String(val).toLowerCase().includes(q)));
+
+        const tbody = document.getElementById('tableBody');
+        if (tbody) {
+          tbody.innerHTML = filtered.length ? filtered.map(r => `
+            <tr>
+              <td>#${r.id}</td>
+              <td>${r.entry_date}</td>
+              <td><span class="badge bg-light text-dark border px-2 py-1">${r.dr_number}</span></td>
+              <td><strong class="text-dark">${r.source}</strong></td>
+              <td>${r.prepile_no || '-'}</td>
+              <td><span class="badge bg-primary-subtle text-primary fw-bold px-2 py-1">${r.ore_class}</span></td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-info me-1 py-1 px-2" onclick="showQRCode('${r.dr_number}', '${r.source}')" title="View QR Code"><i class="bi bi-qr-code"></i></button>
+                <button class="btn btn-sm btn-outline-secondary me-1 py-1 px-2" onclick="viewDetails('${r.id}')" title="View"><i class="bi bi-eye"></i></button>
+                <button class="btn btn-sm btn-outline-primary me-1 py-1 px-2" onclick="openEdit('${r.id}')" title="Edit"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-warning py-1 px-2" onclick="archiveRecord('${r.id}')" title="Archive"><i class="bi bi-archive"></i></button>
+              </td>
+            </tr>
+          `).join('') : `<tr><td colspan="7" class="text-center text-muted py-4">No records found.</td></tr>`;
+        }
+
+        const totalCard = document.getElementById('cardTotalRecords');
+        if (totalCard) totalCard.innerText = records.length;
+        
+        renderDashboardCharts();
+        renderSummary();
+        renderArchiveTable();
+        renderArchiveSummary();
+      };
+
+      function renderDashboardCharts() {
+        let counts = {};
+        oreClassList.forEach(c => counts[c] = 0);
+        records.forEach(r => { if (counts[r.ore_class] !== undefined) counts[r.ore_class]++; });
+
+        const container = document.getElementById('oreTripsContainer');
+        if (container) {
+          container.innerHTML = oreClassList.map(c => `
+            <div class="col-6 col-sm-6 col-md-4 col-lg-3">
+              <div class="ore-card shadow-sm">
+                <div class="d-flex justify-content-between mb-2">
+                  <span class="fw-bold text-primary">${c}</span>
+                  <span class="badge bg-primary-subtle text-primary fw-bold">${counts[c]} Trips</span>
+                </div>
+                <div class="progress" style="height: 6px; border-radius: 4px;">
+                  <div class="progress-bar bg-primary" style="width: ${records.length ? (counts[c]/records.length)*100 : 0}%"></div>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+
+      function renderSummary() {
+        let groups = {};
+        records.forEach(r => {
+          let key = `${r.entry_date}|${r.source}|${r.prepile_no}|${r.ore_class}`;
+          if (!groups[key]) groups[key] = { ...r, count: 0 };
+          groups[key].count++;
+        });
+
+        const summaryBody = document.getElementById('summaryTableBody');
+        if (summaryBody) {
+          summaryBody.innerHTML = Object.values(groups).map(g => `
+            <tr>
+              <td>${g.entry_date}</td>
+              <td>${g.source}</td>
+              <td>${g.prepile_no || '-'}</td>
+              <td><span class="badge bg-primary-subtle text-primary">${g.ore_class}</span></td>
+              <td class="text-center"><strong>${g.count} Trips</strong></td>
+            </tr>
+          `).join('') || `<tr><td colspan="5" class="text-center text-muted py-4">Walang summary data.</td></tr>`;
+        }
+      }
+
+      window.renderArchiveTable = function() {
+        const filterDateEl = document.getElementById('archiveFilterDate');
+        const filterDate = filterDateEl ? filterDateEl.value : '';
+        let filtered = archiveRecords;
+        if (filterDate) { filtered = archiveRecords.filter(r => r.entry_date === filterDate); }
+
+        const archiveBody = document.getElementById('archiveTableBody');
+        if (archiveBody) {
+          archiveBody.innerHTML = filtered.length ? filtered.map(r => `
+            <tr>
+              <td>#${r.id}</td>
+              <td>${r.entry_date}</td>
+              <td>${r.dr_number}</td>
+              <td>${r.source}</td>
+              <td>${r.prepile_no || '-'}</td>
+              <td>${r.ore_class}</td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-outline-success me-1 py-1 px-2" onclick="restoreArchiveRecord('${r.id}')" title="Restore"><i class="bi bi-arrow-counterclockwise"></i> Restore</button>
+                <button class="btn btn-sm btn-outline-danger py-1 px-2" onclick="deleteSingleArchiveRecord('${r.id}')" title="Delete"><i class="bi bi-trash"></i> Delete</button>
+              </td>
+            </tr>
+          `).join('') : `<tr><td colspan="7" class="text-center text-muted py-4">No archived records found.</td></tr>`;
+        }
+      };
+
+      window.renderArchiveSummary = function() {
+        let allCombinedRecords = [...records, ...archiveRecords];
+        let groups = {};
+        
+        allCombinedRecords.forEach(r => {
+          let key = `${r.source}|${r.prepile_no}|${r.ore_class}`;
+          if (!groups[key]) groups[key] = { ...r, count: 0 };
+          groups[key].count++;
+        });
+
+        const archiveSummaryBody = document.getElementById('archiveSummaryTableBody');
+        if (archiveSummaryBody) {
+          archiveSummaryBody.innerHTML = Object.values(groups).map(g => `
+            <tr>
+              <td>${g.source}</td>
+              <td>${g.prepile_no || '-'}</td>
+              <td><span class="badge bg-primary-subtle text-primary">${g.ore_class}</span></td>
+              <td class="text-center"><strong>${g.count} Trips</strong></td>
+            </tr>
+          `).join('') || `<tr><td colspan="4" class="text-center text-muted py-4">Walang summary data.</td></tr>`;
+        }
+      };
+
+      window.restoreArchiveRecord = async function(id) {
+        if (!confirm("Gusto mo bang ibalik ang record na ito sa active list?")) return;
+        const item = archiveRecords.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const restoredItem = {
+          dr_number: item.dr_number,
+          source: item.source,
+          prepile_no: item.prepile_no,
+          ore_class: item.ore_class,
+          entry_date: item.entry_date,
+          created_at: getPhTimestampString()
+        };
+
+        try {
+          if (navigator.onLine && !String(id).startsWith('OFFLINE')) {
+            const { error: insertError } = await supabase.from('dr_records').insert([restoredItem]);
+            if (insertError) throw insertError;
+
+            const { error: deleteError } = await supabase.from('archive_tbl').delete().eq('id', id);
+            if (deleteError) throw deleteError;
+          } else {
+            archiveRecords = archiveRecords.filter(x => String(x.id) !== String(id));
+            records.push({ id: 'OFFLINE-RESTORED-' + Date.now(), ...restoredItem });
+            localStorage.setItem('cached_records', JSON.stringify(records));
+            localStorage.setItem('cached_archive', JSON.stringify(archiveRecords));
+          }
+
+          triggerSuccessFeedback();
+          showNotification('success', `Nai-restore na ang Dumptruck No. ${item.dr_number}!`);
+        } catch (err) {
+          console.error("Restore Error:", err);
+          showNotification('warning', `Nagka-error sa pag-restore: ${err.message || err}`);
+        } finally {
+          await loadDatabaseData();
+        }
+      };
+
+      window.deleteSingleArchiveRecord = async function(id) {
+        if (!confirm("Sigurado ka bang gusto mong BURAHIN ang archived record na ito?")) return;
+
+        try {
+          if (navigator.onLine && !String(id).startsWith('OFFLINE')) {
+            const { error } = await supabase.from('archive_tbl').delete().eq('id', id);
+            if (error) throw error;
+          }
+
+          archiveRecords = archiveRecords.filter(x => String(x.id) !== String(id));
+          localStorage.setItem('cached_archive', JSON.stringify(archiveRecords));
+
+          triggerSuccessFeedback();
+          showNotification('success', 'Nai-delete na ang archived record!');
+        } catch (err) {
+          console.error("Single Archive Delete Error:", err);
+          showNotification('warning', `Nagka-error sa pagbura: ${err.message || err}`);
+        } finally {
+          await loadDatabaseData();
+        }
+      };
+
+      window.viewDetails = function(id) {
+        let r = records.find(x => String(x.id) === String(id));
+        if (!r) return;
+        document.getElementById('viewModalBody').innerHTML = `
+          <div class="list-group list-group-flush rounded-3">
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Record ID:</span> <strong>#${r.id}</strong></div>
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Date:</span> <strong>${r.entry_date}</strong></div>
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Dumptruck No:</span> <strong>${r.dr_number}</strong></div>
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Source:</span> <strong>${r.source}</strong></div>
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Prepile:</span> <strong>${r.prepile_no || '-'}</strong></div>
+            <div class="list-group-item d-flex justify-content-between py-2"><span>Ore Class:</span> <strong>${r.ore_class}</strong></div>
+          </div>`;
+        new bootstrap.Modal(document.getElementById('viewModal')).show();
+      };
+
+      window.openEdit = function(id) {
+        let r = records.find(x => String(x.id) === String(id));
+        if (!r) return;
+        document.getElementById('editRowId').value = r.id;
+        document.getElementById('editModalId').innerText = r.id;
+        document.getElementById('editDate').value = r.entry_date;
+        document.getElementById('editDrNo').value = r.dr_number;
+        document.getElementById('editSource').value = r.source;
+        document.getElementById('editPrepile').value = r.prepile_no || '';
+        document.getElementById('editOreClass').value = r.ore_class;
+        new bootstrap.Modal(document.getElementById('editModal')).show();
+      };
+
+      window.saveEdit = async function(e) {
+        e.preventDefault();
+        let id = document.getElementById('editRowId').value;
+        let payload = {
+          entry_date: document.getElementById('editDate').value,
+          dr_number: document.getElementById('editDrNo').value.toUpperCase().trim(),
+          source: document.getElementById('editSource').value.toUpperCase().trim(),
+          prepile_no: document.getElementById('editPrepile').value || null,
+          ore_class: document.getElementById('editOreClass').value.toUpperCase().trim()
+        };
+
+        if (navigator.onLine && !String(id).startsWith('OFFLINE')) {
+          const { error } = await supabase.from('dr_records').update(payload).eq('id', id);
+          if (error) alert("Error updating record: " + error.message);
+        } else {
+          let idx = records.findIndex(x => String(x.id) === String(id));
+          if (idx !== -1) records[idx] = { id, ...payload };
+          localStorage.setItem('cached_records', JSON.stringify(records));
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+        loadDatabaseData();
+      };
+
+      window.archiveRecord = async function(id) {
+        if (!confirm("Sigurado ka bang gusto mong i-archive ang record na ito?")) return;
+        const item = records.find(x => String(x.id) === String(id));
+        if (!item) return;
+
+        const archiveItem = {
+          original_id: item.id, dr_number: item.dr_number, source: item.source,
+          prepile_no: item.prepile_no, ore_class: item.ore_class, entry_date: item.entry_date
+        };
+
+        if (navigator.onLine && !String(id).startsWith('OFFLINE')) {
+          await supabase.from('archive_tbl').insert([archiveItem]);
+          await supabase.from('dr_records').delete().eq('id', id);
+        } else {
+          let archiveQueue = JSON.parse(localStorage.getItem('offline_archive_queue') || '[]');
+          archiveQueue.push(archiveItem);
+          localStorage.setItem('offline_archive_queue', JSON.stringify(archiveQueue));
+
+          records = records.filter(x => String(x.id) !== String(id));
+          archiveRecords.push({ id: 'OFFLINE-ARC-' + Date.now(), ...archiveItem });
+          localStorage.setItem('cached_records', JSON.stringify(records));
+          localStorage.setItem('cached_archive', JSON.stringify(archiveRecords));
+        }
+
+        loadDatabaseData();
+      };
+
+      window.deleteAllArchiveRecords = async function() {
+        if (archiveRecords.length === 0) {
+          showNotification('warning', 'Walang archived records na mabubura.');
+          return;
+        }
+
+        if (!confirm("Sigurado ka bang gusto mong BURAHIN ANG LAHAT ng archived records?")) return;
+
+        const btn = document.getElementById('btnDeleteAllArchive');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Deleting...';
+        }
+
+        try {
+          if (navigator.onLine) {
+            const { error } = await supabase.from('archive_tbl').delete().neq('id', 0);
+            if (error) throw error;
+          }
+
+          archiveRecords = [];
+          localStorage.setItem('cached_archive', JSON.stringify([]));
+          localStorage.removeItem('offline_archive_queue');
+
+          triggerSuccessFeedback();
+          showNotification('success', 'Nai-delete na ang lahat ng archived records!');
+        } catch (err) {
+          console.error("Delete All Archive Error:", err);
+          showNotification('warning', `Nagka-error sa pagbura: ${err.message || err}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash3 me-1"></i> Delete All';
+          }
+          await loadDatabaseData();
+        }
+      };
+
+      window.archiveAllRecords = async function() {
+        if (records.length === 0) {
+          showNotification('warning', 'Walang active records para i-archive.');
+          return;
+        }
+
+        if (!confirm("Gusto mo bang i-archive ang LAHAT ng active records at i-reset ang ID sequence pabalik sa 1?")) return;
+
+        const btn = document.getElementById('btnArchiveAll');
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Archiving...';
+        }
+
+        try {
+          const archivePayload = records.map(item => ({
+            original_id: item.id,
+            dr_number: item.dr_number,
+            source: item.source,
+            prepile_no: item.prepile_no,
+            ore_class: item.ore_class,
+            entry_date: item.entry_date
+          }));
+
+          if (navigator.onLine) {
+            const { error: archiveError } = await supabase.from('archive_tbl').insert(archivePayload);
+            if (archiveError) throw archiveError;
+
+            const { error: deleteError } = await supabase.from('dr_records').delete().neq('id', 0);
+            if (deleteError) throw deleteError;
+
+            try {
+              await supabase.rpc('reset_dr_records_id_seq');
+            } catch (seqErr) {}
+
+          } else {
+            let archiveQueue = JSON.parse(localStorage.getItem('offline_archive_queue') || '[]');
+            archiveQueue.push(...archivePayload);
+            localStorage.setItem('offline_archive_queue', JSON.stringify(archiveQueue));
+
+            archiveRecords.push(...archivePayload.map((item, idx) => ({ id: 'OFFLINE-ARC-' + (Date.now() + idx), ...item })));
+            localStorage.setItem('cached_records', JSON.stringify(records));
+            localStorage.setItem('cached_archive', JSON.stringify(archiveRecords));
+          }
+
+          records = [];
+          localStorage.setItem('cached_archive', JSON.stringify([]));
+
+          triggerSuccessFeedback();
+          showNotification('success', 'Nai-archive na ang lahat ng records at nai-reset ang ID sa 1!');
+
+        } catch (err) {
+          console.error("Archive All Error:", err);
+          showNotification('warning', `Nagka-error sa pag-archive: ${err.message || err}`);
+        } finally {
+          if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-archive me-1"></i> Archive All';
+          }
+          await loadDatabaseData();
+        }
+      };
+
+      function getPhFilenameTimestamp() {
+        const now = new Date();
+        const formatterDate = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric' });
+        const formatterTime = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Manila', hour: 'numeric', minute: '2-digit', hour12: true });
+
+        const parts = formatterDate.formatToParts(now);
+        const month = parts.find(p => p.type === 'month').value;
+        const day = parts.find(p => p.type === 'day').value;
+        const year = parts.find(p => p.type === 'year').value;
+        const dateStr = `${month}-${day}-${year}`;
+        const timeStr = formatterTime.format(now).replace(/\s/g, '').toUpperCase();
+
+        return `${dateStr}-${timeStr}`;
+      }
+
+      window.exportToCSV = function() {
+        let csv = "ID,Date,Dumptruck No,Source,Prepile No,Ore Class\n";
+        records.forEach(r => { csv += `${r.id},${r.entry_date},${r.dr_number},"${r.source}",${r.prepile_no || ''},${r.ore_class}\n`; });
+        downloadBlob(csv, `DAILY_ORE_TRANSPORTATION_${getPhFilenameTimestamp()}.csv`);
+      };
+
+      window.exportSummaryCSV = function() {
+        let groups = {};
+        records.forEach(r => {
+          let key = `${r.entry_date}|${r.source}|${r.prepile_no}|${r.ore_class}`;
+          if (!groups[key]) groups[key] = { ...r, count: 0 };
+          groups[key].count++;
+        });
+        let csv = "Date,Source,Prepile No,Ore Class,Total Trips\n";
+        Object.values(groups).forEach(g => { csv += `${g.entry_date},"${g.source}",${g.prepile_no || ''},${g.ore_class},${g.count}\n`; });
+        downloadBlob(csv, `SUMMARY_ORE_TRANSPORTATION_${getPhFilenameTimestamp()}.csv`);
+      };
+
+      window.exportArchiveCSV = function() {
+        const filterDateEl = document.getElementById('archiveFilterDate');
+        const filterDate = filterDateEl ? filterDateEl.value : '';
+        let filtered = archiveRecords;
+        if (filterDate) { filtered = archiveRecords.filter(r => r.entry_date === filterDate); }
+
+        let csv = "ID,Date,Dumptruck No,Source,Prepile No,Ore Class\n";
+        filtered.forEach((r, index) => { 
+          csv += `${index + 1},${r.entry_date},${r.dr_number},"${r.source}",${r.prepile_no || ''},${r.ore_class}\n`; 
+        });
+        downloadBlob(csv, `ALL_RECORDS_ORE_TRANSPORTATION_${getPhFilenameTimestamp()}.csv`);
+      };
+
+      window.exportArchiveSummaryCSV = function() {
+        let allCombinedRecords = [...records, ...archiveRecords];
+        let groups = {};
+        allCombinedRecords.forEach(r => {
+          let key = `${r.source}|${r.prepile_no}|${r.ore_class}`;
+          if (!groups[key]) groups[key] = { ...r, count: 0 };
+          groups[key].count++;
+        });
+
+        let csv = "Source,Prepile No,Ore Class,Total Trips\n";
+        Object.values(groups).forEach(g => { csv += `"${g.source}",${g.prepile_no || ''},${g.ore_class},${g.count}\n`; });
+        downloadBlob(csv, `ALL_RECORDS_SUMMARY_ORE_TRANSPORTATION_${getPhFilenameTimestamp()}.csv`);
+      };
+
+      function downloadBlob(content, filename) {
+        let blob = new Blob([content], { type: 'text/csv' });
+        let a = document.createElement('a');
+        a.href = window.URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+      }
+    });
+  </script>
+</body>
+</html>
